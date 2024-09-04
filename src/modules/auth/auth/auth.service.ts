@@ -3,10 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { OtpEntity } from 'src/modules/user/user/entities/otp.entity';
 import { UserEntity } from 'src/modules/user/user/entities/user.entity';
 import { Repository } from 'typeorm';
-import { CheckOtpDto, SendOtpDto } from './dto/auth.dto';
-import { randomInt } from 'crypto';import { TokenPayload } from './types/payload';
+import { CheckOtpDto, SendOtpDto } from './dto/otp.dto';
+import { randomInt } from 'crypto'; import { TokenPayload } from './types/payload';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { SignupDto } from './dto/basic.dto';
+import { hashSync } from 'bcrypt';
 ``
 
 @Injectable()
@@ -15,8 +17,8 @@ export class AuthService {
     constructor(
         @InjectRepository(UserEntity) private userRepository: Repository<UserEntity>,
         @InjectRepository(OtpEntity) private otpRepository: Repository<OtpEntity>,
-        private configService:ConfigService,
-        private jwtService:JwtService) { }
+        private configService: ConfigService,
+        private jwtService: JwtService) { }
 
     async sendOtp(sendOtpDto: SendOtpDto) {
         const { mobile } = sendOtpDto
@@ -24,54 +26,55 @@ export class AuthService {
         if (!user) {
             user = await this.userRepository.create({ mobile })
             user = await this.userRepository.save(user)
-        }else
-        await this.createOtpForUser(user)
-            return {
-                message: "otp code successfully"
-            }
-        
+        } else
+            await this.createOtpForUser(user)
+        return {
+            message: "otp code successfully"
+        }
+
 
 
     }
 
-    async CheckOtp(CheckOtpDto:CheckOtpDto){
-        
-        const {code, mobile}= CheckOtpDto
-       const user= await this.userRepository.findOne({
-       where: {mobile},
-        relations:{otp:true}
-    })
-       if(!user){
-    throw new UnauthorizedException("user not found ")
-    }
-    if(user.otp.code!==code ){
-        throw new UnauthorizedException("otp code it's not match")
-    }
+    async CheckOtp(CheckOtpDto: CheckOtpDto) {
 
-    if(user.otp.expires_in < new Date()){
-        throw new UnauthorizedException( "otp code is expire")
-    }
+        const { code, mobile } = CheckOtpDto
+        const user = await this.userRepository.findOne({
+            where: { mobile },
+            relations: { otp: true }
+        })
+        if (!user) {
+            throw new UnauthorizedException("user not found ")
+        }
+        if (user.otp.code !== code) {
+            throw new UnauthorizedException("otp code it's not match")
+        }
 
-    if(!user.mobile_verify){
-        await this.userRepository.update({id:user.id},{mobile_verify:true})
-        
-    }
+        if (user.otp.expires_in < new Date()) {
+            throw new UnauthorizedException("otp code is expire")
+        }
 
-    const {accessToken,refreshToken}= this.makeTokenForUser({id:user.id,mobile})
-    return {
-        accessToken,
-        refreshToken,
-        message: "you logged  in successfully"}
+        if (!user.mobile_verify) {
+            await this.userRepository.update({ id: user.id }, { mobile_verify: true })
+
+        }
+
+        const { accessToken, refreshToken } = this.makeTokenForUser({ id: user.id, mobile })
+        return {
+            accessToken,
+            refreshToken,
+            message: "you logged  in successfully"
+        }
 
     }
 
     async createOtpForUser(user: UserEntity) {
         const code = randomInt(10000, 99999).toString()
         const expiresIn = new Date(new Date().getTime() + 1000 * 60 * 2)
-        const now =new Date()
+        const now = new Date()
         let otp = await this.otpRepository.findOneBy({ userId: user.id })
         if (otp) {
-            if(otp.expires_in>now){
+            if (otp.expires_in > now) {
                 throw new BadRequestException("otp code not  expired")
             }
             otp.code = code
@@ -91,15 +94,15 @@ export class AuthService {
 
     }
 
-    makeTokenForUser(payload:TokenPayload){
-        const accessToken=  this.jwtService.sign(payload,{
-            secret:this.configService.get("Jwt.accessToken"),
-            expiresIn:"30d"
+    makeTokenForUser(payload: TokenPayload) {
+        const accessToken = this.jwtService.sign(payload, {
+            secret: this.configService.get("Jwt.accessToken"),
+            expiresIn: "30d"
         })
 
-        const refreshToken= this.jwtService.sign(payload,{
+        const refreshToken = this.jwtService.sign(payload, {
             secret: this.configService.get("Jwt.refreshToken"),
-            expiresIn:"1y"
+            expiresIn: "1y"
 
         })
 
@@ -109,17 +112,17 @@ export class AuthService {
         }
     }
 
-    async validationAccessToken(token:string){
+    async validationAccessToken(token: string) {
         try {
-            const payload=this.jwtService.verify<TokenPayload>(token,{
-                secret:this.configService.get("Jwt.accessToken")
+            const payload = this.jwtService.verify<TokenPayload>(token, {
+                secret: this.configService.get("Jwt.accessToken")
             })
 
-            if(typeof payload ==="object" && payload.id){
-                const user=await this.userRepository.findOneBy({id:payload.id})
-                if(!user){
+            if (typeof payload === "object" && payload.id) {
+                const user = await this.userRepository.findOneBy({ id: payload.id })
+                if (!user) {
                     throw new UnauthorizedException(" login on your account ")
-                }else{
+                } else {
                     return user
                 }
             }
@@ -129,12 +132,42 @@ export class AuthService {
 
         } catch (error) {
             throw new UnauthorizedException(" login on your account ")
-            
+
         }
     }
 
+    async signup(signupDto: SignupDto) {
+        const { first_name, last_name, mobile, email, password, confirm_password, } = signupDto
+        const emails = await this.userRepository.findOneBy( {  email } )
+        const mobiles = await this.userRepository.findOneBy( {  mobile } )
+        
+        if (emails?.email) {
+            throw new BadRequestException(emails.email, '  email is already exist')
+        }
+        if (mobiles?.mobile) {
+            throw new BadRequestException(mobiles.mobile, '  mobile is already exist')
+        }
+        
+        // if (password !== confirm_password) {
+        //     throw new BadRequestException("password and confirm password should be  equals ")
+        // }
 
-    
+        const hashPassword = hashSync(password, 12)
+        const newUser = this.userRepository.create({
+            first_name,
+            last_name,
+            mobile,
+            email,
+            password: hashPassword,
+            mobile_verify: false
+        })
+        await this.userRepository.save(newUser)
+        return { message: "user signup successfully" }
+
+    }
+
+
+
 
 
 }
