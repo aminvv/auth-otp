@@ -1,20 +1,27 @@
 import { Column, Entity, OneToOne, PrimaryGeneratedColumn } from "typeorm";
 import { UserEntity } from "./user.entity";
 
+
 @Entity("otp")
-export class OtpEntity{
-    @PrimaryGeneratedColumn('increment')
-    id:number
+export class OtpEntity {
+    @PrimaryGeneratedColumn()
+    id: number
 
     @Column()
-    code:string
+    code: string
 
     @Column()
-    expires_in:Date
-  
-    @Column()
-    userId:number
+    userId: number
 
-    @OneToOne(()=>UserEntity,(user)=>user.otp,{onDelete:"CASCADE"})
+
+    @Column()
+    expires_in: Date
+
+    @OneToOne(() => UserEntity, (user) => user.otp, { onDelete: "CASCADE" })
     user:UserEntity
+
 }
+
+
+
+

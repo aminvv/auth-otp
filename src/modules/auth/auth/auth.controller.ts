@@ -8,13 +8,14 @@ export class AuthController {
 
 
   @Post("/send-otp")
-  sendOtp(@Body() SendOtpDto:SendOtpDto){
-    return this.authService.sendOtp(SendOtpDto)
+  sendOtp(@Body()sendOtpDto:SendOtpDto) {
+    return this.authService.sendOtp(sendOtpDto)
   }
 
+
   @Post("/check-otp")
-  checkOtp(@Body() checkOtpDto:CheckOtpDto) {
-    return this.authService.checkOtp(checkOtpDto);
+  checkOtp(@Body()checkOtp:CheckOtpDto) {
+    return this.authService.CheckOtp(checkOtp)
   }
 
 }

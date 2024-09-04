@@ -1,12 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import {TypeOrmModuleOptions, TypeOrmOptionsFactory} from "@nestjs/typeorm"
-import { Db } from "typeorm";
+import { TypeOrmModuleOptions, TypeOrmOptionsFactory } from "@nestjs/typeorm";
 
 
 
 @Injectable()
- export class TypeOrmDbConfig implements TypeOrmOptionsFactory{
+export class TypeOrmDbConfig implements TypeOrmOptionsFactory{
     constructor(private configService:ConfigService){}
     createTypeOrmOptions(connectionName?: string): Promise<TypeOrmModuleOptions> | TypeOrmModuleOptions {
         return{
@@ -14,13 +13,11 @@ import { Db } from "typeorm";
             host:this.configService.get("Db.host"),
             username:this.configService.get("Db.username"),
             password:this.configService.get("Db.password"),
-            database:this.configService.get("Db.database"),
-            synchronize:true,
+            entities:['dist/**/**/**/*.entity.{.ts,js}'],
             type:"postgres",
-            entities:["dist/**/**/*.entity{.ts,.js}"],
-            
-            
+            database:"auth-otp",
+            synchronize:true
+
         }
     }
-
- }
+}
